@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodge the Dodgeballs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #87CEEB; /* Sky blue background */
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            color: white;
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        #gameArea {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            background-color: #228B22; /* Ground color */
+            border: 3px solid #fff;
+            overflow: hidden;
+        }
+
+        #player {
+            position: absolute;
+            left: 50px;
+            bottom: 50px;  /* Starting at the bottom */
+            width: 50px;
+            height: 50px;
+            background-color: blue;
+            border-radius: 5px;
+        }
+
+        .dodgeball {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            opacity: 1; /* Default opacity */
+        }
+
+        #scoreboard {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #timer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Dodgeball</h1>
+    <div id="gameArea">
+        <div id="player"></div>
+        <div id="scoreboard">Score: 0</div>
+        <div id="timer">Time: 60</div>
+    </div>
+
+    <script>
+        // Game variables
+        const player = document.getElementById("player");
+        const gameArea = document.getElementById("gameArea");
+        const scoreboard = document.getElementById("scoreboard");
+        const timerDisplay = document.getElementById("timer");
+
+        const gameWidth = gameArea.offsetWidth;
+        const gameHeight = gameArea.offsetHeight;
+
+        const playerWidth = player.offsetWidth;
+        const playerHeight = player.offsetHeight;
+
+        let score = 0;
+        let playerX = 50;  // Starting position for player (left side)
+        let playerY = gameHeight / 2 - playerHeight / 2; // Starting at the center vertically
+        const playerSpeed = 5; // Player movement speed
+
+        let dodgeballs = [];
+        let gameSpeed = 1000; // Initial spawn interval for dodgeballs (faster spawn rate)
+        let speedIncreaseInterval = 10000; // Speed increase every 10 seconds
+        let gameRunning = true;
+
+        let timer = 60; // Timer starting at 60 seconds
+        let timerInterval;
+
+        // Speeds for different colors of dodgeballs
+        const dodgeballSpeeds = {
+            yellow: 4,  // Fast
+            red: 6,     // Faster
+            black: 8,   // Very Fast
+        };
+
+        // Update score function
+        function updateScore() {
+            scoreboard.textContent = `Score: ${score}`;
+        }
+
+        // Update timer function
+        function updateTimer() {
+            timerDisplay.textContent = `Time: ${timer}`;
+            if (timer <= 0) {
+                endGame(); // Game over when timer reaches zero
+            }
+        }
+
+        // Function to create a new dodgeball with random color and speed
+        function createDodgeball() {
+            const dodgeball = document.createElement("div");
+            dodgeball.classList.add("dodgeball");
+
+            // Randomly choose a color (excluding the invisible one)
+            const colors = ["yellow", "red", "black"];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+
+            dodgeball.style.backgroundColor = color;
+            const dodgeballX = gameWidth; // Start the dodgeball off-screen (right side)
+            const dodgeballY = Math.random() * (gameHeight - 30); // Random height
+            dodgeball.style.left = `${dodgeballX}px`;
+            dodgeball.style.top = `${dodgeballY}px`;
+
+            gameArea.appendChild(dodgeball);
+            dodgeballs.push({ element: dodgeball, color: color });
+        }
+
+        // Move the player in all directions (up, down, left, right)
+        function movePlayer() {
+            if (playerX < 0) playerX = 0; // Prevent going off the left
+            if (playerX > gameWidth - playerWidth) playerX = gameWidth - playerWidth; // Prevent going off the right
+            if (playerY < 0) playerY = 0; // Prevent going above the screen
+            if (playerY > gameHeight - playerHeight) playerY = gameHeight - playerHeight; // Prevent going below the screen
+            player.style.left = `${playerX}px`;
+            player.style.top = `${playerY}px`;
+        }
+
+        // Move the dodgeballs based on their speeds and behavior
+        function moveDodgeballs() {
+            dodgeballs.forEach((dodgeball, index) => {
+                let dodgeballX = parseInt(dodgeball.element.style.left);
+                let dodgeballY = parseInt(dodgeball.element.style.top);
+
+                // Normal movement for dodgeballs
+                const speed = dodgeballSpeeds[dodgeball.color]; // Get speed based on color
+                dodgeballX -= speed;
+
+                dodgeball.element.style.left = `${dodgeballX}px`;
+                dodgeball.element.style.top = `${dodgeballY}px`;
+
+                // Check for collision
+                if (
+                    dodgeballX < playerX + playerWidth &&
+                    dodgeballX + 30 > playerX &&
+                    dodgeballY + 30 > playerY &&
+                    dodgeballY < playerY + playerHeight
+                ) {
+                    endGame(); // End game if collision happens
+                }
+
+                // Remove the dodgeball when it goes off-screen
+                if (dodgeballX < -30 || dodgeballY < -30 || dodgeballY > gameHeight) {
+                    gameArea.removeChild(dodgeball.element);
+                    dodgeballs.splice(index, 1);
+                    score++; // Increase score
+                    updateScore();
+                }
+            });
+        }
+
+        // Function to handle game over
+        function endGame() {
+            alert("Game Over! Final Score: " + score);
+            gameRunning = false;
+            clearInterval(dodgeballSpawner);  // Stop spawning dodgeballs
+            clearInterval(difficultyInterval);  // Stop difficulty increases
+            clearInterval(timerInterval);  // Stop the timer
+        }
+
+        // Function to handle win condition
+        function checkWin() {
+            if (score >= 50) {
+                alert("You Win! Final Score: " + score);
+                gameRunning = false;
+                clearInterval(dodgeballSpawner);  // Stop spawning dodgeballs
+                clearInterval(difficultyInterval);  // Stop difficulty increases
+                clearInterval(timerInterval);  // Stop the timer
+            }
+        }
+
+        // Function to handle key presses for moving the player
+        document.addEventListener("keydown", (e) => {
+            if (!gameRunning) return;  // Ignore player movement if game has ended
+
+            if (e.code === "ArrowUp") {
+                playerY -= playerSpeed;
+            } else if (e.code === "ArrowDown") {
+                playerY += playerSpeed;
+            } else if (e.code === "ArrowLeft") {
+                playerX -= playerSpeed;
+            } else if (e.code === "ArrowRight") {
+                playerX += playerSpeed;
+            }
+        });
+
+        // Increase difficulty every 10 seconds (faster speed, more dodgeballs)
+        function increaseDifficulty() {
+            // Increase dodgeball speed
+            Object.keys(dodgeballSpeeds).forEach(color => {
+                dodgeballSpeeds[color] += 0.5; // Increase speed for all dodgeballs
+            });
+
+            // Reduce spawn interval (increase frequency of dodgeball spawning)
+            if (gameSpeed > 500) {
+                gameSpeed -= 100; // Decrease the spawn time
+            }
+
+            // Increase the number of dodgeballs being spawned
+            let additionalDodgeballs = Math.floor(score / 5);
+            for (let i = 0; i < additionalDodgeballs; i++) {
+                createDodgeball();
+            }
+        }
+
+        // Spawn dodgeballs at regular intervals
+        const dodgeballSpawner = setInterval(createDodgeball, gameSpeed);
+
+        // Increase difficulty at intervals
+        const difficultyInterval = setInterval(increaseDifficulty, speedIncreaseInterval);
+
+        // Start the timer countdown
+        timerInterval = setInterval(() => {
+            if (gameRunning) {
+                timer--;
+                updateTimer();
+                checkWin();
+            }
+        }, 1000);
+
+        // Game loop
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            movePlayer();
+            moveDodgeballs();
+            checkWin();
+        }
+
+        // Start the game loop (60 FPS)
+        setInterval(gameLoop, 1000 / 60);
+    </script>
+</body>
+</html>
